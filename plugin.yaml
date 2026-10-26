@@ -1,0 +1,9 @@
+name: grok-bot-bridge
+version: 0.1.0
+description: "Dispatch a task from the Hermes chat model to a Grok Bot, then inject the Bot's result back into that same chat. Does not use gbot."
+author: KinFx
+provides_tools:
+  - grok_bot_task
+  - grok_bot_job
+provides_hooks:
+  - pre_llm_call
