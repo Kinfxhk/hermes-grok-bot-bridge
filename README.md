@@ -20,7 +20,7 @@ export GROK_BOT_WAKE_URL='https://...'
 export GROK_BOT_WAKE_SECRET='whsec_...'
 ```
 
-唔好把呢兩個值寫入 repo、commit 或聊天。
+`whsec_` secrets are signed as Standard Webhooks. Any other secret is sent as `Authorization: Bearer`. The live Grok Bot webhook uses the bearer form. Keep both values in `~/.hermes/grok-bot-bridge/wake.env` (mode 600), not in this repo.
 
 把 `bot-skill.md` 存成 Grok Bot skill，等 Bot 知道要打 callback，唔好只留喺自己個 chat。
 

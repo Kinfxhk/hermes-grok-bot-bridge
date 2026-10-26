@@ -72,6 +72,38 @@ def new_job(task: str, bot: str, session_key: str | None = None) -> dict:
     return rec
 
 
+def load_wake_config() -> tuple[str, str]:
+    url = os.environ.get(WAKE_URL, "")
+    secret = os.environ.get(WAKE_SECRET, "")
+    if url and secret:
+        return url, secret
+    path = state_dir().parent / "wake.env"
+    if not path.is_file():
+        return url, secret
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key == WAKE_URL and not url:
+            url = value
+        elif key == WAKE_SECRET and not secret:
+            secret = value
+    return url, secret
+
+
+def wake_headers(secret: str, body: bytes) -> dict[str, str]:
+    headers = {"content-type": "application/json"}
+    if secret.startswith("whsec_"):
+        webhook_id = "msg_" + uuid.uuid4().hex
+        timestamp = str(int(time.time()))
+        headers["webhook-id"] = webhook_id
+        headers["webhook-timestamp"] = timestamp
+        headers["webhook-signature"] = sign_body(secret, body, webhook_id, timestamp)
+    else:
+        headers["Authorization"] = "Bearer " + secret
+    return headers
+
+
 def callback_url(job_id: str) -> str:
     base = os.environ.get(PUBLIC_URL, "").rstrip("/")
     if not base:
@@ -80,8 +112,7 @@ def callback_url(job_id: str) -> str:
 
 
 def wake(rec: dict) -> tuple[int, str]:
-    url = os.environ.get(WAKE_URL, "")
-    secret = os.environ.get(WAKE_SECRET, "")
+    url, secret = load_wake_config()
     if not url or not secret:
         raise RuntimeError("set GROK_BOT_WAKE_URL and GROK_BOT_WAKE_SECRET")
     payload = {
@@ -97,19 +128,7 @@ def wake(rec: dict) -> tuple[int, str]:
         ),
     }
     body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
-    webhook_id = "msg_" + uuid.uuid4().hex
-    timestamp = str(int(time.time()))
-    req = urllib.request.Request(
-        url,
-        data=body,
-        method="POST",
-        headers={
-            "content-type": "application/json",
-            "webhook-id": webhook_id,
-            "webhook-timestamp": timestamp,
-            "webhook-signature": sign_body(secret, body, webhook_id, timestamp),
-        },
-    )
+    req = urllib.request.Request(url, data=body, method="POST", headers=wake_headers(secret, body))
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             status = resp.status
