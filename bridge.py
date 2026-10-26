@@ -1,6 +1,6 @@
 """Sign a Grok wake and store the job until the Bot posts a result.
 
-Stdlib only. Secrets stay in the environment. This file does not import Hermes.
+Stdlib only. Secrets stay in the environment or in wake.env. No Hermes import.
 """
 
 from __future__ import annotations
@@ -23,7 +23,8 @@ PORT = "GROK_BOT_BRIDGE_PORT"
 
 
 def state_dir() -> Path:
-    root = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+    # "" must not become Path(".") and scatter state into the process CWD.
+    root = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
     path = root / "grok-bot-bridge" / "jobs"
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -72,18 +73,26 @@ def new_job(task: str, bot: str, session_key: str | None = None) -> dict:
     return rec
 
 
+def wake_env_path() -> Path:
+    return state_dir().parent / "wake.env"
+
+
 def load_wake_config() -> tuple[str, str]:
-    url = os.environ.get(WAKE_URL, "")
-    secret = os.environ.get(WAKE_SECRET, "")
+    url = (os.environ.get(WAKE_URL) or "").strip()
+    secret = (os.environ.get(WAKE_SECRET) or "").strip()
     if url and secret:
         return url, secret
-    path = state_dir().parent / "wake.env"
+    path = wake_env_path()
     if not path.is_file():
         return url, secret
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
+        # Accept both a bare KEY=value and a pasted shell line: export KEY='value'
+        key = key.strip().removeprefix("export ").strip()
+        value = value.strip().strip("'\"")
         if key == WAKE_URL and not url:
             url = value
         elif key == WAKE_SECRET and not secret:
@@ -114,7 +123,12 @@ def callback_url(job_id: str) -> str:
 def wake(rec: dict) -> tuple[int, str]:
     url, secret = load_wake_config()
     if not url or not secret:
-        raise RuntimeError("set GROK_BOT_WAKE_URL and GROK_BOT_WAKE_SECRET")
+        path = wake_env_path()
+        raise RuntimeError(
+            "Grok Bot wake is not configured: no usable GROK_BOT_WAKE_URL/GROK_BOT_WAKE_SECRET. "
+            f"env url={'set' if url else 'empty'}, secret={'set' if secret else 'empty'}; "
+            f"wake.env {path} {'exists' if path.is_file() else 'MISSING'}"
+        )
     payload = {
         "job_id": rec["job_id"],
         "bot": rec["bot"],

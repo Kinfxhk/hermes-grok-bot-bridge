@@ -57,5 +57,57 @@ class SignTest(unittest.TestCase):
         self.assertIn("token", raw)
 
 
+class WakeEnvTest(unittest.TestCase):
+    def setUp(self):
+        self._env = {k: os.environ.pop(k, None) for k in ("GROK_BOT_WAKE_URL", "GROK_BOT_WAKE_SECRET")}
+        self.path = bridge.wake_env_path()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.exists():
+            self.path.unlink()
+
+    def tearDown(self):
+        if self.path.exists():
+            self.path.unlink()
+        for k, v in self._env.items():
+            if v is not None:
+                os.environ[k] = v
+
+    def test_reads_export_and_quoted_lines(self):
+        self.path.write_text(
+            "# comment\n"
+            "export GROK_BOT_WAKE_URL='https://routine.example/wake'\n"
+            'GROK_BOT_WAKE_SECRET="crsr_abc"\n'
+        )
+        url, secret = bridge.load_wake_config()
+        self.assertEqual(url, "https://routine.example/wake")
+        self.assertEqual(secret, "crsr_abc")
+
+    def test_env_wins_over_file(self):
+        self.path.write_text("GROK_BOT_WAKE_URL=https://file\nGROK_BOT_WAKE_SECRET=file-secret\n")
+        os.environ["GROK_BOT_WAKE_URL"] = "https://env"
+        os.environ["GROK_BOT_WAKE_SECRET"] = "env-secret"
+        self.assertEqual(bridge.load_wake_config(), ("https://env", "env-secret"))
+
+    def test_empty_hermes_home_does_not_become_dot(self):
+        real = os.environ.get("HERMES_HOME")
+        try:
+            os.environ["HERMES_HOME"] = ""
+            got = bridge.state_dir()
+            self.assertEqual(got, Path.home() / ".hermes" / "grok-bot-bridge" / "jobs")
+        finally:
+            if real is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = real
+
+    def test_error_says_which_path_was_checked(self):
+        rec = bridge.new_job("x", "Boss")
+        with self.assertRaises(RuntimeError) as cm:
+            bridge.wake(rec)
+        msg = str(cm.exception)
+        self.assertIn("MISSING", msg)
+        self.assertIn(str(self.path), msg)
+
+
 if __name__ == "__main__":
     unittest.main()
