@@ -11,6 +11,18 @@ An HTTP 200 from the wake endpoint means the run started. It does not mean the w
 3. The Bot does the work on its cloud computer. Closing the desktop app does not stop that run.
 4. The Bot POSTs the result to the callback. Hermes injects it into the same chat.
 
+## What it can do
+
+| Use | |
+| --- | --- |
+| Start a cloud run on one webhook routine you already created | ✓ |
+| Keep the Hermes chat free while that run is in flight | ✓ |
+| Treat HTTP 200 or 202 as "run started", not "work finished" | ✓ |
+| Take the Bot's callback and inject the summary into the same chat | ✓ |
+| Run that cloud job with the Grok Bot window closed | ✓ |
+
+The callback URL must be reachable from the cloud computer. `127.0.0.1` is not.
+
 ## Wake auth
 
 Create a routine with a Webhook trigger in Grok Bot. The secret is shown once.

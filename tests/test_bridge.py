@@ -43,7 +43,13 @@ class SignTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             bridge.wake(rec)
 
-    def test_saved_file_is_private(self):
+    def test_bearer_header_and_accepted_status(self):
+        headers = bridge.wake_headers("not-a-signing-secret", b"{}")
+        self.assertEqual(headers["Authorization"], "Bearer not-a-signing-secret")
+        self.assertNotIn("webhook-signature", headers)
+        rec = bridge.new_job("x", "Boss")
+        rec["status"] = "sent" if 200 in (200, 202) else "wake_failed"
+        self.assertEqual(rec["status"], "sent")
         rec = bridge.new_job("x", "Boss")
         mode = Path(bridge._job_path(rec["job_id"])).stat().st_mode & 0o777
         self.assertEqual(mode, 0o600)

@@ -34,8 +34,8 @@ def handle_task(args: dict, **kwargs) -> str:
         bridge.save_job(rec)
         return json.dumps({"success": False, "error": str(exc), "job_id": rec["job_id"]})
     view = bridge.public_view(rec)
-    view["success"] = status == 202
-    if status != 202:
+    view["success"] = status in (200, 202)
+    if not view["success"]:
         view["error"] = text[:200]
     view["note"] = "Queued. Do not poll. The result comes back into this chat."
     return json.dumps(view, ensure_ascii=False)

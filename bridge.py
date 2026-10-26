@@ -136,7 +136,7 @@ def wake(rec: dict) -> tuple[int, str]:
     except urllib.error.HTTPError as exc:
         status = exc.code
         text = exc.read(300).decode("utf-8", "replace")
-    rec["status"] = "sent" if status == 202 else "wake_failed"
+    rec["status"] = "sent" if status in (200, 202) else "wake_failed"
     rec["wake_http"] = status
     save_job(rec)
     return status, text
