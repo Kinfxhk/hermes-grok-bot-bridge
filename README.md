@@ -1,36 +1,36 @@
 # hermes-grok-bot-bridge
 
-Hermes 聊天 model 派工，Grok Bot 做完交返同一個對話。唔用 gbot，唔拆 app session。
+Hermes owns the chat. A Grok Bot does the computer work, then posts the result back into the same Hermes chat. The plugin does not change which model is pinned for chat.
 
-聊天 model 可以係 DeepSeek、Grok 訂閱，或者你而家 pin 住嘅任何一個。呢個插件唔改 model。
+An HTTP 200 from the wake endpoint means the run started. It does not mean the work finished. The finished result is the callback into Hermes, which replaces opening the Bot chat.
 
-## 環
+## Loop
 
-1. 聊天 model 叫 `grok_bot_task`。
-2. 插件用 Standard Webhooks 簽好名，POST 去你喺 Grok 開嘅 webhook。`202` 先算派到。工具即刻返 job id，唔阻塞。
-3. Grok Bot 做完，POST 結果去 callback。
-4. 插件把結果注入原對話。聊天 model 再整理答你。
+1. The chat model calls `grok_bot_task`.
+2. The plugin POSTs the task to a Grok Bot routine webhook and returns a job id immediately.
+3. The Bot does the work on its cloud computer. Closing the desktop app does not stop that run.
+4. The Bot POSTs the result to the callback. Hermes injects it into the same chat.
 
-## 你要做嘅一步
+## Wake auth
 
-喺 Grok automation / Bot routine 加 **Webhook** trigger。secret 只顯示一次。
+Create a routine with a Webhook trigger in Grok Bot. The secret is shown once.
 
 ```bash
 export GROK_BOT_WAKE_URL='https://...'
-export GROK_BOT_WAKE_SECRET='whsec_...'
+export GROK_BOT_WAKE_SECRET='...'
 ```
 
-`whsec_` secrets are signed as Standard Webhooks. Any other secret is sent as `Authorization: Bearer`. The live Grok Bot webhook uses the bearer form. Keep both values in `~/.hermes/grok-bot-bridge/wake.env` (mode 600), not in this repo.
+A secret that starts with `whsec_` is signed as a Standard Webhook. Any other secret is sent as `Authorization: Bearer`. The routine webhook uses the bearer form.
 
-把 `bot-skill.md` 存成 Grok Bot skill，等 Bot 知道要打 callback，唔好只留喺自己個 chat。
+Prefer `~/.hermes/grok-bot-bridge/wake.env` (mode 600) over the environment. Never commit the URL or the secret.
 
-## 安裝
+Save `bot-skill.md` as a Grok Bot skill so the Bot posts the callback instead of leaving the result only in its own chat.
+
+## Install
 
 ```bash
 ln -s "$PWD" ~/.hermes/plugins/grok-bot-bridge
 ```
-
-`config.yaml`：
 
 ```yaml
 plugins:
@@ -41,20 +41,23 @@ plugins:
       allow_gateway_injection: true
 ```
 
-Gateway 要重新載入先見到工具。呢步會影響成個 fleet，要你自己批，插件唔會自己重啟。
+Reload the gateway before the tool appears in a new session. This plugin does not restart the gateway.
 
-雲端 Bot 打唔到 `127.0.0.1`。要交返雲端結果，設 `GROK_BOT_BRIDGE_PUBLIC_URL` 做一個 Bot 打到嘅地址，再 `GROK_BOT_BRIDGE_LISTEN=1`。預設只聽 `127.0.0.1:8766`，俾本機 local-exec 交還。
+The cloud computer cannot reach `127.0.0.1`. Set `GROK_BOT_BRIDGE_PUBLIC_URL` to an address the Bot can reach, and `GROK_BOT_BRIDGE_LISTEN=1`. The default listener is `127.0.0.1:8766`, for a local return only.
 
-## 測試
+## Test
 
 ```bash
 python3 tests/test_bridge.py
 ```
 
-冇 wake URL 就唔會打出去。live 派工要你自己嘅 endpoint。
+Without a wake URL the plugin does not send. A live dispatch needs your own endpoint.
 
-## 唔做
+## Out of scope
 
-- gbot / grok-bot-cli
-- 讀 Grok Bot app session 或 `CURSOR_ACCESS_TOKEN`
-- 把 secret 放進 repo
+- Reading the Grok Bot app session or a Cursor access token
+- Putting a secret in this repo
+
+## Support
+
+Free to use. If it helps: https://buymeacoffee.com/kinfxhk
